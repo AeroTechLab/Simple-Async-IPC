@@ -10,7 +10,9 @@ set( LIBRARY_DIR ${CMAKE_CURRENT_LIST_DIR} CACHE PATH "Relative or absolute path
 
 set( USE_IP_LEGACY false CACHE BOOL "Enable to compile for older systems, with no modern socket options (e.g. IPv6)" )
 
-include( ${CMAKE_CURRENT_LIST_DIR}/threads/CMakeLists.txt )
+if( NOT TARGET MultiThreading )
+  include( ${CMAKE_CURRENT_LIST_DIR}/threads/CMakeLists.txt )
+endif()
 
 add_library( AsyncIPC SHARED ${CMAKE_CURRENT_LIST_DIR}/ipc.c ${CMAKE_CURRENT_LIST_DIR}/ipc_base_ip.c )
 set_target_properties( AsyncIPC PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${LIBRARY_DIR} )
