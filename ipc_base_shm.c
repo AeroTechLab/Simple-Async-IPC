@@ -20,7 +20,7 @@
 //////////////////////////////////////////////////////////////////////////////////////
 
 
-#include "ipc_base_ip.h"
+#include "ipc_base_shm.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -171,7 +171,7 @@ void SharedObjects_DestroyObject( void* sharedObjectData )
 #include <sys/shm.h>
 #include <sys/stat.h>
 
-typedef struct _SHMMappingData
+struct _SHMMappingData
 {
   void* dataIn;
   void* dataOut;
