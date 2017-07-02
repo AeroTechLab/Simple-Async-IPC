@@ -33,14 +33,14 @@
 
 #define SHARED_OBJECT_PATH_MAX_LENGTH 256   ///< Maximum length of the shared object path (file mapping path, network variable)
   
-typedef struct _SHMConnectionData SHMConnectionData;
-typedef SHMConnectionData* SHMConnection;  
+typedef struct _SHMMappingData SHMMappingData;
+typedef SHMMappingData* SHMMapping;  
   
 #ifdef WIN32
 
 #include <windows.h>
 
-typedef struct _SHMConnectionData
+typedef struct _SHMMappingData
 {
   void* dataIn;
   void* dataOut;
@@ -49,7 +49,7 @@ typedef struct _SHMConnectionData
 };
 
 
-IPCBaseConnection SHM_OpenConnection( Byte connectionType, const char* mappingName, uint16_t channel )
+IPCBaseConnection SHM_OpenConnection( Byte mappingType, const char* mappingName, uint16_t channel )
 {
   int accessFlag = FILE_MAP_ALL_ACCESS;
   if( flags == SHM_READ ) accessFlag = FILE_MAP_READ;
@@ -76,68 +76,68 @@ IPCBaseConnection SHM_OpenConnection( Byte connectionType, const char* mappingNa
   
   char mappingFilePath[ SHARED_OBJECT_PATH_MAX_LENGTH ];
   
-  SHMConnection newConnection = (SHMConnection) malloc( sizeof(SHMConnectionData) );
+  SHMMapping newMapping = (SHMMapping) malloc( sizeof(SHMMappingData) );
   
   sprintf( mappingFilePath, "/dev/shm/%s_server_client_%u", mappingName, channel );
   
-  if( connectionType & IPC_CLIENT )
-    newConnection->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
-  else // if( connectionType & IPC_SERVER )
-    newConnection->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
+  if( mappingType & IPC_CLIENT )
+    newMapping->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
+  else // if( mappingType & IPC_SERVER )
+    newMapping->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
   
   sprintf( mappingFilePath, "/dev/shm/%s_client_server_%u", mappingName, channel );
   
-  if( connectionType & IPC_CLIENT )
-    newConnection->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
-  else // if( connectionType & IPC_SERVER )
-    newConnection->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
+  if( mappingType & IPC_CLIENT )
+    newMapping->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
+  else // if( mappingType & IPC_SERVER )
+    newMapping->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
   
-  if( newConnection->dataIn == NULL || newConnection->dataOut == NULL )
+  if( newMapping->dataIn == NULL || newMapping->dataOut == NULL )
   {
-    SHM_CloseConnection( newConnection );
+    SHM_CloseConnection( newMapping );
     return NULL;
   }
   
-  newConnection->readCount = newConnection->writeCount = 0;
+  newMapping->readCount = newMapping->writeCount = 0;
   
-  return newConnection;
+  return newMapping;
 }
 
-bool SHM_ReceiveMessage( IPCBaseConnection ref_connection, Byte* message )
+bool SHM_ReceiveMessage( IPCBaseConnection ref_mapping, Byte* message )
 {  
-  if( ref_connection == NULL ) return false;
-  SHMConnection connection = (SHMConnection) ref_connection;
+  if( ref_mapping == NULL ) return false;
+  SHMMapping mapping = (SHMMapping) ref_mapping;
     
-  if( ((Byte*) connection->dataIn)[ IPC_MAX_MESSAGE_LENGTH ] == connection->readCount ) return false;
+  if( ((Byte*) mapping->dataIn)[ IPC_MAX_MESSAGE_LENGTH ] == mapping->readCount ) return false;
   
-  memcpy( message, connection->dataIn, IPC_MAX_MESSAGE_LENGTH );
+  memcpy( message, mapping->dataIn, IPC_MAX_MESSAGE_LENGTH );
   
-  connection->readCount = ((Byte*) connection->dataIn)[ IPC_MAX_MESSAGE_LENGTH ];
+  mapping->readCount = ((Byte*) mapping->dataIn)[ IPC_MAX_MESSAGE_LENGTH ];
   
   return true;
 }
 
-bool SHM_SendMessage( IPCBaseConnection ref_connection, const Byte* message )
+bool SHM_SendMessage( IPCBaseConnection ref_mapping, const Byte* message )
 {  
-  if( ref_connection == NULL ) return false;
-  SHMConnection connection = (SHMConnection) ref_connection;
+  if( ref_mapping == NULL ) return false;
+  SHMMapping mapping = (SHMMapping) ref_mapping;
   
-  memcpy( connection->dataOut, message, IPC_MAX_MESSAGE_LENGTH );
+  memcpy( mapping->dataOut, message, IPC_MAX_MESSAGE_LENGTH );
   
-  ((Byte*) connection->dataIn)[ IPC_MAX_MESSAGE_LENGTH ] = ++connection->writeCount;
+  ((Byte*) mapping->dataIn)[ IPC_MAX_MESSAGE_LENGTH ] = ++mapping->writeCount;
   
   return true;
 }
 
-void SHM_CloseConnection( IPCBaseConnection ref_connection )
+void SHM_CloseConnection( IPCBaseConnection ref_mapping )
 {
-  if( ref_connection == NULL ) return;
-  SHMConnection connection = (SHMConnection) ref_connection;
+  if( ref_mapping == NULL ) return;
+  SHMMapping mapping = (SHMMapping) ref_mapping;
   
-  if( connection->dataIn != NULL ) shmdt( connection->dataIn );
-  if( connection->dataOut != NULL ) shmdt( connection->dataOut );
+  if( mapping->dataIn != NULL ) shmdt( mapping->dataIn );
+  if( mapping->dataOut != NULL ) shmdt( mapping->dataOut );
   
-  free( connection );
+  free( mapping );
 }
 
 void SharedObjects_DestroyObject( void* sharedObjectData )
@@ -171,14 +171,14 @@ void SharedObjects_DestroyObject( void* sharedObjectData )
 #include <sys/shm.h>
 #include <sys/stat.h>
 
-typedef struct _SHMConnectionData
+typedef struct _SHMMappingData
 {
   void* dataIn;
   void* dataOut;
   Byte readCount, writeCount;
 };
 
-void* OpenFileMapping( const char* mappingPath, int accessOption )
+void* OpenFileMapping( const char* mappingFilePath, int accessOption )
 {
   // Shared memory is mapped to a file. So we create a new file.
   FILE* mappedFile = fopen( mappingFilePath, "r+" );
@@ -221,72 +221,72 @@ void* OpenFileMapping( const char* mappingPath, int accessOption )
   return newSharedObject;
 }
 
-IPCBaseConnection SHM_OpenConnection( Byte connectionType, const char* mappingName, uint16_t channel )
+IPCBaseConnection SHM_OpenMapping( Byte mappingType, const char* mappingName, uint16_t index )
 {
   char mappingFilePath[ SHARED_OBJECT_PATH_MAX_LENGTH ];
   
-  SHMConnection newConnection = (SHMConnection) malloc( sizeof(SHMConnectionData) );
+  SHMMapping newMapping = (SHMMapping) malloc( sizeof(SHMMappingData) );
   
-  sprintf( mappingFilePath, "/dev/shm/%s_server_client_%u", mappingName, channel );
+  sprintf( mappingFilePath, "/dev/shm/%s_server_client_%u", mappingName, index );
   
-  if( connectionType & IPC_CLIENT )
-    newConnection->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
-  else // if( connectionType & IPC_SERVER )
-    newConnection->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
+  if( mappingType & IPC_CLIENT )
+    newMapping->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
+  else // if( mappingType & IPC_SERVER )
+    newMapping->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
   
-  sprintf( mappingFilePath, "/dev/shm/%s_client_server_%u", mappingName, channel );
+  sprintf( mappingFilePath, "/dev/shm/%s_client_server_%u", mappingName, index );
   
-  if( connectionType & IPC_CLIENT )
-    newConnection->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
-  else // if( connectionType & IPC_SERVER )
-    newConnection->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
+  if( mappingType & IPC_CLIENT )
+    newMapping->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
+  else // if( mappingType & IPC_SERVER )
+    newMapping->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
   
-  if( newConnection->dataIn == NULL || newConnection->dataOut == NULL )
+  if( newMapping->dataIn == NULL || newMapping->dataOut == NULL )
   {
-    SHM_CloseConnection( newConnection );
+    SHM_CloseMapping( newMapping );
     return NULL;
   }
   
-  newConnection->readCount = newConnection->writeCount = 0;
+  newMapping->readCount = newMapping->writeCount = 0;
   
-  return newConnection;
+  return newMapping;
 }
 
-bool SHM_ReceiveMessage( IPCBaseConnection ref_connection, Byte* message )
+bool SHM_ReceiveMessage( IPCBaseConnection ref_mapping, Byte* message )
 {  
-  if( ref_connection == NULL ) return false;
-  SHMConnection connection = (SHMConnection) ref_connection;
+  if( ref_mapping == NULL ) return false;
+  SHMMapping mapping = (SHMMapping) ref_mapping;
     
-  if( ((Byte*) connection->dataIn)[ IPC_MAX_MESSAGE_LENGTH ] == connection->readCount ) return false;
+  if( ((Byte*) mapping->dataIn)[ IPC_MAX_MESSAGE_LENGTH ] == mapping->readCount ) return false;
   
-  memcpy( message, connection->dataIn, IPC_MAX_MESSAGE_LENGTH );
+  memcpy( message, mapping->dataIn, IPC_MAX_MESSAGE_LENGTH );
   
-  connection->readCount = ((Byte*) connection->dataIn)[ IPC_MAX_MESSAGE_LENGTH ];
+  mapping->readCount = ((Byte*) mapping->dataIn)[ IPC_MAX_MESSAGE_LENGTH ];
   
   return true;
 }
 
-bool SHM_SendMessage( IPCBaseConnection ref_connection, const Byte* message )
+bool SHM_SendMessage( IPCBaseConnection ref_mapping, const Byte* message )
 {  
-  if( ref_connection == NULL ) return false;
-  SHMConnection connection = (SHMConnection) ref_connection;
+  if( ref_mapping == NULL ) return false;
+  SHMMapping mapping = (SHMMapping) ref_mapping;
   
-  memcpy( connection->dataOut, message, IPC_MAX_MESSAGE_LENGTH );
+  memcpy( mapping->dataOut, message, IPC_MAX_MESSAGE_LENGTH );
   
-  ((Byte*) connection->dataIn)[ IPC_MAX_MESSAGE_LENGTH ] = ++connection->writeCount;
+  ((Byte*) mapping->dataIn)[ IPC_MAX_MESSAGE_LENGTH ] = ++mapping->writeCount;
   
   return true;
 }
 
-void SHM_CloseConnection( IPCBaseConnection ref_connection )
+void SHM_CloseMapping( IPCBaseConnection ref_mapping )
 {
-  if( ref_connection == NULL ) return;
-  SHMConnection connection = (SHMConnection) ref_connection;
+  if( ref_mapping == NULL ) return;
+  SHMMapping mapping = (SHMMapping) ref_mapping;
   
-  if( connection->dataIn != NULL ) shmdt( connection->dataIn );
-  if( connection->dataOut != NULL ) shmdt( connection->dataOut );
+  if( mapping->dataIn != NULL ) shmdt( mapping->dataIn );
+  if( mapping->dataOut != NULL ) shmdt( mapping->dataOut );
   
-  free( connection );
+  free( mapping );
 }
 
 #endif

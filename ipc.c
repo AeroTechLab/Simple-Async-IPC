@@ -57,11 +57,11 @@ IPCConnection IPC_OpenConnection( Byte connectionType, const char* host, uint16_
   }
   else if( transport == IPC_SHM )
   {
-    fprintf( stderr, "shm:/dev/shm/%s_%u", ( host != NULL ) ? host : "", channel );
-    newConnection->baseConnection = SHM_OpenConnection( connectionType, host, channel );
-    newConnection->ref_ReadMessage = SHM_ReceiveMessage;
-    newConnection->ref_WriteMessage = SHM_SendMessage;
-    newConnection->ref_Close = SHM_CloseConnection;    
+    fprintf( stderr, "shm:/dev/shm/%s_%u", ( host != NULL ) ? host : "data", channel );
+    newConnection->baseConnection = SHM_OpenMapping( connectionType, host, channel );
+    newConnection->ref_ReadMessage = SHM_ReadData;
+    newConnection->ref_WriteMessage = SHM_WriteData;
+    newConnection->ref_Close = SHM_CloseMapping;    
   }
   
   if( newConnection->baseConnection == NULL )

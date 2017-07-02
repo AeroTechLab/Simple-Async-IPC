@@ -14,7 +14,7 @@ if( NOT TARGET MultiThreading )
   include( ${CMAKE_CURRENT_LIST_DIR}/threads/CMakeLists.txt )
 endif()
 
-add_library( AsyncIPC SHARED ${CMAKE_CURRENT_LIST_DIR}/ipc.c ${CMAKE_CURRENT_LIST_DIR}/ipc_base_ip.c )
+add_library( AsyncIPC SHARED ${CMAKE_CURRENT_LIST_DIR}/ipc.c ${CMAKE_CURRENT_LIST_DIR}/ipc_base_ip.c ${CMAKE_CURRENT_LIST_DIR}/ipc_base_shm.c )
 set_target_properties( AsyncIPC PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${LIBRARY_DIR} )
 target_link_libraries( AsyncIPC MultiThreading )
 if( UNIX AND NOT APPLE )

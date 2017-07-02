@@ -34,27 +34,27 @@
 
 
 /// @brief Creates a new IP connection structure (with defined properties) and add it to the asynchronous connections list                              
-/// @param[in] connectionType flag defining connection as client or server, TCP or UDP (see ip_connection.h)                                   
-/// @param[in] host IPv4 or IPv6 host string (NULL for server listening on any local address)                                         
-/// @param[in] port IP port number (local for server, remote for client)       
+/// @param[in] mappingType flag defining connection as client or server, TCP or UDP (see ip_connection.h)                                   
+/// @param[in] path IPv4 or IPv6 host string (NULL for server listening on any local address)                                         
+/// @param[in] index IP port number (local for server, remote for client)       
 /// @return unique generic identifier to newly created connection (NULL on error) 
-IPCBaseConnection SHM_OpenConnection( Byte connectionType, const char* path, uint16_t channel );
+IPCBaseConnection SHM_OpenMapping( Byte mappingType, const char* path, uint16_t index );
 
 /// @brief Handle termination of given connection                                   
-/// @param[in] connection connection reference
-void SHM_CloseConnection( IPCBaseConnection connection );
+/// @param[in] mapping connection reference
+void SHM_CloseMapping( IPCBaseConnection mapping );
  
 /// @brief Calls type specific client method for receiving network messages                      
-/// @param[in] connection client connection reference  
+/// @param[in] mapping client connection reference  
 /// @param[in] message message string pointer
 /// @return pointer to message string, overwritten on next call to ReceiveMessage() (NULL on error)  
-bool SHM_ReceiveMessage( IPCBaseConnection connection, Byte* message );
+bool SHM_ReadData( IPCBaseConnection mapping, Byte* message );
                                                                              
 /// @brief Calls type specific connection method for sending network messages                                                
-/// @param[in] connection connection reference   
+/// @param[in] mapping connection reference   
 /// @param[in] message message string pointer  
 /// @return true on success, false on error  
-bool SHM_SendMessage( IPCBaseConnection connection, const Byte* message );
+bool SHM_WriteData( IPCBaseConnection mapping, const Byte* message );
 
 
 #endif // IPC_BASE_SHM_H
