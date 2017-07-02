@@ -252,7 +252,7 @@ IPCBaseConnection SHM_OpenMapping( Byte mappingType, const char* mappingName, ui
   return newMapping;
 }
 
-bool SHM_ReceiveMessage( IPCBaseConnection ref_mapping, Byte* message )
+bool SHM_ReadData( IPCBaseConnection ref_mapping, Byte* message )
 {  
   if( ref_mapping == NULL ) return false;
   SHMMapping mapping = (SHMMapping) ref_mapping;
@@ -266,7 +266,7 @@ bool SHM_ReceiveMessage( IPCBaseConnection ref_mapping, Byte* message )
   return true;
 }
 
-bool SHM_SendMessage( IPCBaseConnection ref_mapping, const Byte* message )
+bool SHM_WriteData( IPCBaseConnection ref_mapping, const Byte* message )
 {  
   if( ref_mapping == NULL ) return false;
   SHMMapping mapping = (SHMMapping) ref_mapping;
