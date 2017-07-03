@@ -212,6 +212,9 @@ static IPConnection AddConnection( Socket socketFD, IPAddress address, Byte tran
   connection->clientsList = NULL;
   connection->remotesCount = 0;
   
+  connection->readQueue = TSQ_Create( QUEUE_MAX_ITEMS, IPC_MAX_MESSAGE_LENGTH );
+  connection->writeQueue = TSQ_Create( QUEUE_MAX_ITEMS, IPC_MAX_MESSAGE_LENGTH );
+  
   if( networkRole == IPC_SERVER ) // Server role connection
   {
     connection->ref_ReceiveMessage = ( transportProtocol == IPC_TCP ) ? ReceiveTCPServerMessages : ReceiveUDPServerMessages;
@@ -549,6 +552,7 @@ IPCBaseConnection IP_OpenConnection( Byte connectionType, const char* host, uint
     {
       globalReadThread = Thread_Start( AsyncReadQueues, NULL, THREAD_JOINABLE );
       globalWriteThread = Thread_Start( AsyncWriteQueues, NULL, THREAD_JOINABLE );
+      activeConnectionsCount++;
     }
   }
   
