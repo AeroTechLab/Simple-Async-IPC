@@ -60,9 +60,13 @@ IPCConnection IPC_OpenConnection( enum IPCMode mode, const char* host, const cha
   else // SHM host
   {
     fprintf( stderr, "shm://%s/%s", host, channel );
-    enum MapType mappingType = SHM_CLIENT;
-    if( mode == IPC_PUB || mode == IPC_REP || mode == IPC_SERVER ) mappingType = SHM_SERVER;
-    newConnection->baseConnection = SHM_OpenMapping( mappingType, host, channel );
+    newConnection->baseConnection = NULL;
+    if( mode == IPC_REQ ) newConnection->baseConnection = SHM_OpenMapping( host, channel, "rep", "req" );
+    else if( mode == IPC_REP ) newConnection->baseConnection = SHM_OpenMapping( host, channel, "req", "rep" );
+    else if( mode == IPC_PUB ) newConnection->baseConnection = SHM_OpenMapping( host, channel, "sub", "pub" );
+    else if( mode == IPC_SUB ) newConnection->baseConnection = SHM_OpenMapping( host, channel, "pub", "sub" );
+    else if( mode == IPC_CLIENT ) newConnection->baseConnection = SHM_OpenMapping( host, channel, "server", "client" );
+    else if( mode == IPC_SERVER ) newConnection->baseConnection = SHM_OpenMapping( host, channel, "client", "server" );
     newConnection->ref_ReadMessage = SHM_ReadData;
     newConnection->ref_WriteMessage = SHM_WriteData;
     newConnection->ref_Close = SHM_CloseMapping;    

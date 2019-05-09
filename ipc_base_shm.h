@@ -28,9 +28,7 @@
 #include <stdbool.h>
 
 
-enum MapType { SHM_CLIENT, SHM_SERVER };
-
-void* SHM_OpenMapping( enum MapType mappingType, const char* dirPath, const char* filePath );
+void* SHM_OpenMapping( const char* dirPath, const char* baseName, const char* inSuffix, const char* outSuffix );
 
 void SHM_CloseMapping( void* mapping );
  

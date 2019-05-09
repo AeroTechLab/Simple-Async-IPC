@@ -28,11 +28,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define SHM_READ 0xF0   ///< Flag to allow data to be read from the created shared object
-#define SHM_WRITE 0x0F  ///< Flag to allow data to be written to the created shared object
-
 #define SHARED_OBJECT_BUFFER_LENGTH 512
-#define SHARED_OBJECT_PATH_MAX_LENGTH 256   ///< Maximum length of the shared object path (file mapping path, network variable)
+#define SHARED_OBJECT_PATH_MAX_LENGTH 256
   
 typedef struct _SHMMappingData SHMMappingData;
 typedef SHMMappingData* SHMMapping;  
@@ -222,25 +219,19 @@ uint8_t* OpenFileMapping( const char* mappingFilePath, int accessOption )
   return (uint8_t*) newSharedObject;
 }
 
-void* SHM_OpenMapping( enum MapType mappingType, const char* dirPath, const char* filePath )
+void* SHM_OpenMapping( const char* dirPath, const char* baseName, const char* inSuffix, const char* outSuffix )
 {
   char mappingFilePath[ SHARED_OBJECT_PATH_MAX_LENGTH ];
   
   SHMMapping newMapping = (SHMMapping) malloc( sizeof(SHMMappingData) );
   
-  snprintf( mappingFilePath, SHARED_OBJECT_PATH_MAX_LENGTH, "%s/%s_server", dirPath, filePath );
+  snprintf( mappingFilePath, SHARED_OBJECT_PATH_MAX_LENGTH, "%s/%s_%s", dirPath, baseName, inSuffix );
   
-  if( mappingType == SHM_CLIENT )
-    newMapping->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
-  else // if( mappingType & IPC_SERVER )
-    newMapping->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
+  newMapping->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
   
-  snprintf( mappingFilePath, SHARED_OBJECT_PATH_MAX_LENGTH, "%s/%s_client", dirPath, filePath );
+  snprintf( mappingFilePath, SHARED_OBJECT_PATH_MAX_LENGTH, "%s/%s_%s", dirPath, baseName, outSuffix );
   
-  if( mappingType == SHM_CLIENT )
-    newMapping->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
-  else // if( mappingType & IPC_SERVER )
-    newMapping->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
+  newMapping->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
   
   if( newMapping->dataIn == NULL || newMapping->dataOut == NULL )
   {
