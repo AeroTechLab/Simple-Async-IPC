@@ -179,7 +179,7 @@ bool IP_IsValidAddress( const char* addressString )
   if( inet_pton( AF_INET6, addressString, &ipv6Address ) == 1 ) return true;
   #else
   else if( strcmp( addressString, "255.255.255.255" ) == 0 ) return true; 
-  else if( inet_addr( host ) != INADDR_NONE ) return true;
+  else if( inet_addr( addressString ) != INADDR_NONE ) return true;
   #endif
   return false;
 }
