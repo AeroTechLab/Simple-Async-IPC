@@ -31,6 +31,7 @@
 #define SHM_READ 0xF0   ///< Flag to allow data to be read from the created shared object
 #define SHM_WRITE 0x0F  ///< Flag to allow data to be written to the created shared object
 
+#define SHARED_OBJECT_BUFFER_LENGTH 512
 #define SHARED_OBJECT_PATH_MAX_LENGTH 256   ///< Maximum length of the shared object path (file mapping path, network variable)
   
 typedef struct _SHMMappingData SHMMappingData;
@@ -108,11 +109,11 @@ bool SHM_ReceiveMessage( IPCBaseConnection ref_mapping, Byte* message )
   if( ref_mapping == NULL ) return false;
   SHMMapping mapping = (SHMMapping) ref_mapping;
     
-  if( ((Byte*) mapping->dataIn)[ IPC_MAX_MESSAGE_LENGTH ] == mapping->readCount ) return false;
+  if( ((Byte*) mapping->dataIn)[ SHARED_OBJECT_BUFFER_LENGTH ] == mapping->readCount ) return false;
   
-  memcpy( message, mapping->dataIn, IPC_MAX_MESSAGE_LENGTH );
+  memcpy( message, mapping->dataIn, SHARED_OBJECT_BUFFER_LENGTH );
   
-  mapping->readCount = ((Byte*) mapping->dataIn)[ IPC_MAX_MESSAGE_LENGTH ];
+  mapping->readCount = ((Byte*) mapping->dataIn)[ SHARED_OBJECT_BUFFER_LENGTH ];
   
   return true;
 }
@@ -122,9 +123,9 @@ bool SHM_SendMessage( IPCBaseConnection ref_mapping, const Byte* message )
   if( ref_mapping == NULL ) return false;
   SHMMapping mapping = (SHMMapping) ref_mapping;
   
-  memcpy( mapping->dataOut, message, IPC_MAX_MESSAGE_LENGTH );
+  memcpy( mapping->dataOut, message, SHARED_OBJECT_BUFFER_LENGTH );
   
-  ((Byte*) mapping->dataIn)[ IPC_MAX_MESSAGE_LENGTH ] = ++mapping->writeCount;
+  ((Byte*) mapping->dataIn)[ SHARED_OBJECT_BUFFER_LENGTH ] = ++mapping->writeCount;
   
   return true;
 }
@@ -173,12 +174,12 @@ void SharedObjects_DestroyObject( void* sharedObjectData )
 
 struct _SHMMappingData
 {
-  void* dataIn;
-  void* dataOut;
-  Byte readCount, writeCount;
+  uint8_t* dataIn;
+  uint8_t* dataOut;
+  size_t readCount, writeCount;
 };
 
-void* OpenFileMapping( const char* mappingFilePath, int accessOption )
+uint8_t* OpenFileMapping( const char* mappingFilePath, int accessOption )
 {
   // Shared memory is mapped to a file. So we create a new file.
   FILE* mappedFile = fopen( mappingFilePath, "r+" );
@@ -201,7 +202,7 @@ void* OpenFileMapping( const char* mappingFilePath, int accessOption )
   }
   
   // Reserves shared memory area and returns a file descriptor to it
-  int sharedMemoryID = shmget( sharedKey, IPC_MAX_MESSAGE_LENGTH + 1, IPC_CREAT | accessOption );
+  int sharedMemoryID = shmget( sharedKey, SHARED_OBJECT_BUFFER_LENGTH + 1, IPC_CREAT | accessOption );
   if( sharedMemoryID == -1 )
   {
     perror( "Failed to create shared memory segment" );
@@ -218,25 +219,25 @@ void* OpenFileMapping( const char* mappingFilePath, int accessOption )
     return NULL;
   }
   
-  return newSharedObject;
+  return (uint8_t*) newSharedObject;
 }
 
-IPCBaseConnection SHM_OpenMapping( Byte mappingType, const char* mappingName, uint16_t index )
+void* SHM_OpenMapping( enum MapType mappingType, const char* dirPath, const char* filePath )
 {
   char mappingFilePath[ SHARED_OBJECT_PATH_MAX_LENGTH ];
   
   SHMMapping newMapping = (SHMMapping) malloc( sizeof(SHMMappingData) );
   
-  sprintf( mappingFilePath, "/dev/shm/%s_server_client_%u", mappingName, index );
+  snprintf( mappingFilePath, SHARED_OBJECT_PATH_MAX_LENGTH, "%s/%s_server", dirPath, filePath );
   
-  if( mappingType & IPC_CLIENT )
+  if( mappingType == SHM_CLIENT )
     newMapping->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
   else // if( mappingType & IPC_SERVER )
     newMapping->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
   
-  sprintf( mappingFilePath, "/dev/shm/%s_client_server_%u", mappingName, index );
+  snprintf( mappingFilePath, SHARED_OBJECT_PATH_MAX_LENGTH, "%s/%s_client", dirPath, filePath );
   
-  if( mappingType & IPC_CLIENT )
+  if( mappingType == SHM_CLIENT )
     newMapping->dataOut = OpenFileMapping( mappingFilePath, S_IWUSR );
   else // if( mappingType & IPC_SERVER )
     newMapping->dataIn = OpenFileMapping( mappingFilePath, S_IRUSR );
@@ -252,33 +253,33 @@ IPCBaseConnection SHM_OpenMapping( Byte mappingType, const char* mappingName, ui
   return newMapping;
 }
 
-bool SHM_ReadData( IPCBaseConnection ref_mapping, Byte* message )
+bool SHM_ReadData( void* ref_mapping, uint8_t* message )
 {  
   if( ref_mapping == NULL ) return false;
   SHMMapping mapping = (SHMMapping) ref_mapping;
     
-  if( ((Byte*) mapping->dataIn)[ IPC_MAX_MESSAGE_LENGTH ] == mapping->readCount ) return false;
+  if( mapping->dataIn[ SHARED_OBJECT_BUFFER_LENGTH ] == mapping->readCount ) return false;
   
-  memcpy( message, mapping->dataIn, IPC_MAX_MESSAGE_LENGTH );
+  memcpy( message, mapping->dataIn, SHARED_OBJECT_BUFFER_LENGTH );
   
-  mapping->readCount = ((Byte*) mapping->dataIn)[ IPC_MAX_MESSAGE_LENGTH ];
+  mapping->readCount = mapping->dataIn[ SHARED_OBJECT_BUFFER_LENGTH ];
   
   return true;
 }
 
-bool SHM_WriteData( IPCBaseConnection ref_mapping, const Byte* message )
+bool SHM_WriteData( void* ref_mapping, const uint8_t* message )
 {  
   if( ref_mapping == NULL ) return false;
   SHMMapping mapping = (SHMMapping) ref_mapping;
   
-  memcpy( mapping->dataOut, message, IPC_MAX_MESSAGE_LENGTH );
+  memcpy( mapping->dataOut, message, SHARED_OBJECT_BUFFER_LENGTH );
   
-  ((Byte*) mapping->dataIn)[ IPC_MAX_MESSAGE_LENGTH ] = ++mapping->writeCount;
+  mapping->dataIn[ SHARED_OBJECT_BUFFER_LENGTH ] = ++mapping->writeCount;
   
   return true;
 }
 
-void SHM_CloseMapping( IPCBaseConnection ref_mapping )
+void SHM_CloseMapping( void* ref_mapping )
 {
   if( ref_mapping == NULL ) return;
   SHMMapping mapping = (SHMMapping) ref_mapping;

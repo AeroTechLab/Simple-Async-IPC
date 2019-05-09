@@ -70,8 +70,11 @@
   typedef int Socket;
 #endif
 
+#define IP_MAX_MESSAGE_LENGTH 512
 #define PORT_LENGTH 6                                           // Maximum length of short integer string representation
   
+typedef uint8_t Message[ IP_MAX_MESSAGE_LENGTH ];  
+
 #ifndef IP_NETWORK_LEGACY
   #include <poll.h>
   typedef struct pollfd SocketPoller;
@@ -112,7 +115,7 @@ struct _IPConnectionData
 {
   SocketPoller* socket;
   void (*ref_ReceiveMessage)( IPConnection );
-  void (*ref_SendMessage)( IPConnection, const Byte* );
+  void (*ref_SendMessage)( IPConnection, const uint8_t* );
   void (*ref_Close)( IPConnection );
   IPAddressData addressData;
   union {
@@ -153,10 +156,10 @@ static void ReceiveTCPClientMessage( IPConnection );
 static void ReceiveUDPClientMessage( IPConnection );
 static void ReceiveTCPServerMessages( IPConnection );
 static void ReceiveUDPServerMessages( IPConnection );
-static void SendTCPClientMessage( IPConnection, const Byte* );
-static void SendUDPClientMessage( IPConnection, const Byte* );
-static void SendTCPServerMessages( IPConnection, const Byte* );
-static void SendUDPServerMessages( IPConnection, const Byte* );
+static void SendTCPClientMessage( IPConnection, const uint8_t* );
+static void SendUDPClientMessage( IPConnection, const uint8_t* );
+static void SendTCPServerMessages( IPConnection, const uint8_t* );
+static void SendUDPServerMessages( IPConnection, const uint8_t* );
 static void CloseTCPServer( IPConnection );
 static void CloseUDPServer( IPConnection );
 static void CloseTCPClient( IPConnection );
@@ -165,6 +168,21 @@ static void CloseUDPClient( IPConnection );
 static void* AsyncReadQueues( void* );
 static void* AsyncWriteQueues( void* );
 
+
+bool IP_IsValidAddress( const char* addressString )
+{
+  if( addressString == NULL ) return true;
+  #ifndef IP_NETWORK_LEGACY
+  struct sockaddr_in ipv4Address;
+  if( inet_pton( AF_INET, addressString, &ipv4Address ) == 1 ) return true;
+  struct sockaddr_in6 ipv6Address;
+  if( inet_pton( AF_INET6, addressString, &ipv6Address ) == 1 ) return true;
+  #else
+  else if( strcmp( addressString, "255.255.255.255" ) == 0 ) return true; 
+  else if( inet_addr( host ) != INADDR_NONE ) return true;
+  #endif
+  return false;
+}
 
 //////////////////////////////////////////////////////////////////////////////////
 /////                             INITIALIZATION                             /////
@@ -200,7 +218,7 @@ static SocketPoller* AddSocketPoller( Socket socketFD )
 }
 
 // Handle construction of a IPConnection structure with the defined properties
-static IPConnection AddConnection( Socket socketFD, IPAddress address, Byte transportProtocol, Byte networkRole )
+static IPConnection AddConnection( Socket socketFD, IPAddress address, uint8_t transportProtocol, uint8_t networkRole )
 {
   IPConnection connection = (IPConnection) malloc( sizeof(IPConnectionData) );
   memset( connection, 0, sizeof(IPConnectionData) );
@@ -212,28 +230,28 @@ static IPConnection AddConnection( Socket socketFD, IPAddress address, Byte tran
   connection->clientsList = NULL;
   connection->remotesCount = 0;
   
-  connection->readQueue = TSQ_Create( QUEUE_MAX_ITEMS, IPC_MAX_MESSAGE_LENGTH );
-  connection->writeQueue = TSQ_Create( QUEUE_MAX_ITEMS, IPC_MAX_MESSAGE_LENGTH );
+  connection->readQueue = TSQ_Create( QUEUE_MAX_ITEMS, IP_MAX_MESSAGE_LENGTH );
+  connection->writeQueue = TSQ_Create( QUEUE_MAX_ITEMS, IP_MAX_MESSAGE_LENGTH );
   
-  if( networkRole == IPC_SERVER ) // Server role connection
+  if( networkRole == IP_SERVER ) // Server role connection
   {
-    connection->ref_ReceiveMessage = ( transportProtocol == IPC_TCP ) ? ReceiveTCPServerMessages : ReceiveUDPServerMessages;
-    connection->ref_SendMessage = ( transportProtocol == IPC_TCP ) ? SendTCPServerMessages : SendUDPServerMessages;
-    if( transportProtocol == IPC_UDP && IS_IP_MULTICAST_ADDRESS( address ) ) connection->ref_SendMessage = SendUDPClientMessage;
-    connection->ref_Close = ( transportProtocol == IPC_TCP ) ? CloseTCPServer : CloseUDPServer;
+    connection->ref_ReceiveMessage = ( transportProtocol == IP_TCP ) ? ReceiveTCPServerMessages : ReceiveUDPServerMessages;
+    connection->ref_SendMessage = ( transportProtocol == IP_TCP ) ? SendTCPServerMessages : SendUDPServerMessages;
+    if( transportProtocol == IP_UDP && IS_IP_MULTICAST_ADDRESS( address ) ) connection->ref_SendMessage = SendUDPClientMessage;
+    connection->ref_Close = ( transportProtocol == IP_TCP ) ? CloseTCPServer : CloseUDPServer;
   }
   else
   { 
     //connection->address->sin6_family = AF_INET6;
-    connection->ref_ReceiveMessage = ( transportProtocol == IPC_TCP ) ? ReceiveTCPClientMessage : ReceiveUDPClientMessage;
-    connection->ref_SendMessage = ( transportProtocol == IPC_TCP ) ? SendTCPClientMessage : SendUDPClientMessage;
-    connection->ref_Close = ( transportProtocol == IPC_TCP ) ? CloseTCPClient : CloseUDPClient;
+    connection->ref_ReceiveMessage = ( transportProtocol == IP_TCP ) ? ReceiveTCPClientMessage : ReceiveUDPClientMessage;
+    connection->ref_SendMessage = ( transportProtocol == IP_TCP ) ? SendTCPClientMessage : SendUDPClientMessage;
+    connection->ref_Close = ( transportProtocol == IP_TCP ) ? CloseTCPClient : CloseUDPClient;
   }
   
   return connection;
 }
 
-IPAddress LoadAddressInfo( const char* host, const char* port, Byte networkRole )
+IPAddress LoadAddressInfo( const char* host, const char* port, uint8_t networkRole )
 {
   static IPAddressData addressData;
   
@@ -258,12 +276,12 @@ IPAddress LoadAddressInfo( const char* host, const char* port, Byte networkRole 
                         
   if( host == NULL )
   {
-    if( networkRole == IPC_SERVER )
+    if( networkRole == IP_SERVER )
     {
       hints.ai_flags |= AI_PASSIVE;                   // Set address for me
       hints.ai_family = AF_INET6;                     // IPv6 address
     }
-    else // if( networkRole == IPC_CLIENT )
+    else // if( networkRole == IP_CLIENT )
       return NULL;
   }
   
@@ -295,12 +313,12 @@ int CreateSocket( uint8_t protocol, IPAddress address )
 {
   int socketType, transportProtocol;
   
-  if( protocol == IPC_TCP ) 
+  if( protocol == IP_TCP ) 
   {
     socketType = SOCK_STREAM;
     transportProtocol = IPPROTO_TCP;
   }
-  else if( protocol == IPC_UDP ) 
+  else if( protocol == IP_UDP ) 
   {
     socketType = SOCK_DGRAM;
     transportProtocol = IPPROTO_UDP;
@@ -313,7 +331,7 @@ int CreateSocket( uint8_t protocol, IPAddress address )
   // Create IP socket
   int socketFD = socket( address->sa_family, socketType, transportProtocol );
   if( socketFD == INVALID_SOCKET )
-    fprintf( stderr, "socket: failed opening %s %s socket", ( protocol == IPC_TCP ) ? "TCP" : "UDP", ( address->sa_family == AF_INET6 ) ? "IPv6" : "IPv4" );                                                              
+    fprintf( stderr, "socket: failed opening %s %s socket", ( protocol == IP_TCP ) ? "TCP" : "UDP", ( address->sa_family == AF_INET6 ) ? "IPv6" : "IPv4" );                                                              
   
   return socketFD;
 }
@@ -506,20 +524,18 @@ bool ConnectUDPClientSocket( int socketFD, IPAddress address )
 }
 
 // Generic method for opening a new socket and providing a corresponding IPConnection structure for use
-IPCBaseConnection IP_OpenConnection( Byte connectionType, const char* host, uint16_t port )
+void* IP_OpenConnection( uint8_t connectionType, const char* host, const char* port )
 {
-  const Byte TRANSPORT_MASK = 0xF0, ROLE_MASK = 0x0F;
-  static char portString[ PORT_LENGTH ];
+  const uint8_t TRANSPORT_MASK = 0xF0, ROLE_MASK = 0x0F;
   
   // Assure that the port number is in the Dynamic/Private range (49152-65535)
-  if( port < 49152 /*|| port > 65535*/ )
+  if( strtoul( port, NULL, 0 ) < 49152 /*|| strtoul( port, NULL, 0 ) > 65535*/ )
   {
-    fprintf( stderr, "invalid port number value: %u", port );
+    fprintf( stderr, "invalid port number value: %lu", strtoul( port, NULL, 0 ) );
     return NULL;
   }
   
-  sprintf( portString, "%u", port );
-  IPAddress address = LoadAddressInfo( host, portString, (connectionType & ROLE_MASK) );
+  IPAddress address = LoadAddressInfo( host, port, (connectionType & ROLE_MASK) );
   if( address == NULL ) return NULL;
   
   Socket socketFD = CreateSocket( (connectionType & TRANSPORT_MASK), address );
@@ -529,13 +545,13 @@ IPCBaseConnection IP_OpenConnection( Byte connectionType, const char* host, uint
   
   switch( connectionType )
   {
-    case( IPC_TCP | IPC_SERVER ): if( !BindTCPServerSocket( socketFD, address ) ) return NULL;
+    case( IP_TCP | IP_SERVER ): if( !BindTCPServerSocket( socketFD, address ) ) return NULL;
       break;
-    case( IPC_UDP | IPC_SERVER ): if( !BindUDPServerSocket( socketFD, address ) ) return NULL;
+    case( IP_UDP | IP_SERVER ): if( !BindUDPServerSocket( socketFD, address ) ) return NULL;
       break;
-    case( IPC_TCP | IPC_CLIENT ): if( !ConnectTCPClientSocket( socketFD, address ) ) return NULL;
+    case( IP_TCP | IP_CLIENT ): if( !ConnectTCPClientSocket( socketFD, address ) ) return NULL;
       break;
-    case( IPC_UDP | IPC_CLIENT ): if( !ConnectUDPClientSocket( socketFD, address ) ) return NULL;
+    case( IP_UDP | IP_CLIENT ): if( !ConnectUDPClientSocket( socketFD, address ) ) return NULL;
       break;
     default: fprintf( stderr, "invalid connection type: %x", connectionType );
       return NULL;
@@ -556,7 +572,7 @@ IPCBaseConnection IP_OpenConnection( Byte connectionType, const char* host, uint
     }
   }
   
-  return (IPCBaseConnection) newConnection;
+  return (void*) newConnection;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -616,7 +632,7 @@ static void* AsyncWriteQueues( void* args )
       
       TSQ_Dequeue( connection->writeQueue, (void*) &messageOut, TSQUEUE_WAIT );
   
-      connection->ref_SendMessage( connection, (const Byte*) messageOut );
+      connection->ref_SendMessage( connection, (const uint8_t*) messageOut );
     }
     
 #ifdef _WIN32
@@ -635,7 +651,7 @@ static void* AsyncWriteQueues( void* args )
 
 // Get (and remove) message from the beginning (oldest) of the given index corresponding read queue
 // Method to be called from the main thread
-bool IP_ReceiveMessage( IPCBaseConnection ref_connection, Byte* message )
+bool IP_ReceiveMessage( void* ref_connection, uint8_t* message )
 {  
   if( ref_connection == NULL ) return false;
   IPConnection connection = (IPConnection) ref_connection;
@@ -648,7 +664,7 @@ bool IP_ReceiveMessage( IPCBaseConnection ref_connection, Byte* message )
   return true;
 }
 
-bool IP_SendMessage( IPCBaseConnection ref_connection, const Byte* message )
+bool IP_SendMessage( void* ref_connection, const uint8_t* message )
 {  
   if( ref_connection == NULL ) return false;
   IPConnection connection = (IPConnection) ref_connection;
@@ -707,7 +723,7 @@ static void ReceiveTCPClientMessage( IPConnection connection )
   if( IsDataAvailable( connection->socket ) == false ) return;
   
   // Blocks until there is something to be read in the socket
-  int bytesReceived = recv( connection->socket->fd, (void*) messageIn, IPC_MAX_MESSAGE_LENGTH, 0 );
+  int bytesReceived = recv( connection->socket->fd, (void*) messageIn, IP_MAX_MESSAGE_LENGTH, 0 );
 
   if( bytesReceived == SOCKET_ERROR )
   {
@@ -728,9 +744,9 @@ static void ReceiveTCPClientMessage( IPConnection connection )
 }
 
 // Send given message through the given TCP connection
-static void SendTCPClientMessage( IPConnection connection, const Byte* message )
+static void SendTCPClientMessage( IPConnection connection, const uint8_t* message )
 {
-  if( send( connection->socket->fd, (void*) message, IPC_MAX_MESSAGE_LENGTH, 0 ) == SOCKET_ERROR )
+  if( send( connection->socket->fd, (void*) message, IP_MAX_MESSAGE_LENGTH, 0 ) == SOCKET_ERROR )
     fprintf( stderr, "send: error writing to socket %d", connection->socket->fd );
 }
 
@@ -744,7 +760,7 @@ static void ReceiveUDPClientMessage( IPConnection connection )
   // Blocks until there is something to be read in the socket
   IPAddressData address;
   socklen_t addressLength = sizeof(IPAddressData);
-  if( recvfrom( connection->socket->fd, (void*) messageIn, IPC_MAX_MESSAGE_LENGTH, 0, (IPAddress) &(address), &addressLength ) == SOCKET_ERROR )
+  if( recvfrom( connection->socket->fd, (void*) messageIn, IP_MAX_MESSAGE_LENGTH, 0, (IPAddress) &(address), &addressLength ) == SOCKET_ERROR )
   {
     //fprintf( stderr, "recvfrom: error reading from socket %d", connection->socket->fd );
     return;
@@ -754,31 +770,31 @@ static void ReceiveUDPClientMessage( IPConnection connection )
 }
 
 // Send given message through the given UDP connection
-static void SendUDPClientMessage( IPConnection connection, const Byte* message )
+static void SendUDPClientMessage( IPConnection connection, const uint8_t* message )
 {
-  if( sendto( connection->socket->fd, message, IPC_MAX_MESSAGE_LENGTH, 0, (IPAddress) &(connection->addressData), sizeof(IPAddressData) ) == SOCKET_ERROR )
+  if( sendto( connection->socket->fd, message, IP_MAX_MESSAGE_LENGTH, 0, (IPAddress) &(connection->addressData), sizeof(IPAddressData) ) == SOCKET_ERROR )
     fprintf( stderr, "sendto: error writing to socket %d", connection->socket->fd );
 }
 
 // Send given message to all the clients of the given TCP server connection
-static void SendTCPServerMessages( IPConnection connection, const Byte* message )
+static void SendTCPServerMessages( IPConnection connection, const uint8_t* message )
 {
   for( size_t clientIndex = 0; clientIndex < connection->remotesCount; clientIndex++ )
   {
     SocketPoller* clientSocket = (SocketPoller*) connection->clientsList[ clientIndex ];
-    if( send( clientSocket->fd, message, IPC_MAX_MESSAGE_LENGTH, 0 ) == SOCKET_ERROR )
+    if( send( clientSocket->fd, message, IP_MAX_MESSAGE_LENGTH, 0 ) == SOCKET_ERROR )
       fprintf( stderr, "send: error writing to socket %d", clientSocket->fd );
   }
 }
 
 // Send given message to all the clients of the given server connection
-static void SendUDPServerMessages( IPConnection connection, const Byte* message )
+static void SendUDPServerMessages( IPConnection connection, const uint8_t* message )
 {
   for( size_t clientIndex = 0; clientIndex < connection->remotesCount; clientIndex++ )
   {
     socklen_t addressLength = sizeof(IPAddressData);
     IPAddress clientAddress = (IPAddress) &(connection->addressesList[ clientIndex ]);
-    if( sendto( connection->socket->fd, (void*) message, IPC_MAX_MESSAGE_LENGTH, 0, clientAddress, addressLength ) == SOCKET_ERROR )
+    if( sendto( connection->socket->fd, (void*) message, IP_MAX_MESSAGE_LENGTH, 0, clientAddress, addressLength ) == SOCKET_ERROR )
       fprintf( stderr, "send: error writing to socket %d", connection->socket->fd );
   }
 }
@@ -805,7 +821,7 @@ static void ReceiveTCPServerMessages( IPConnection server )
     SocketPoller* clientSocket = (SocketPoller*) server->clientsList[ clientIndex ];
     if( IsDataAvailable( clientSocket ) )
     {
-      int bytesReceived = recv( clientSocket->fd, (void*) messageIn, IPC_MAX_MESSAGE_LENGTH, 0 );
+      int bytesReceived = recv( clientSocket->fd, (void*) messageIn, IP_MAX_MESSAGE_LENGTH, 0 );
       if( bytesReceived == SOCKET_ERROR ) 
       {
         fprintf( stderr, "recv: error reading from socket %d\n", clientSocket->fd );
@@ -832,7 +848,7 @@ static void ReceiveUDPServerMessages( IPConnection server )
   
   IPAddressData addressData;
   socklen_t addressLength = sizeof(IPAddressData);
-  if( recvfrom( server->socket->fd, (void*) messageIn, IPC_MAX_MESSAGE_LENGTH, 0, (IPAddress) &(addressData), &addressLength ) == SOCKET_ERROR )
+  if( recvfrom( server->socket->fd, (void*) messageIn, IP_MAX_MESSAGE_LENGTH, 0, (IPAddress) &(addressData), &addressLength ) == SOCKET_ERROR )
   {
     fprintf( stderr, "recvfrom: error reading from socket %d", server->socket->fd );
     return;
@@ -908,7 +924,7 @@ static int CompareConnections( const void* connection_1, const void* connection_
   return ( ((IPConnection) connection_1)->socket - ((IPConnection) connection_2)->socket );
 }
 
-void IP_CloseConnection( IPCBaseConnection ref_connection )
+void IP_CloseConnection( void* ref_connection )
 {
   if( ref_connection == NULL ) return;
   IPConnection connection = (IPConnection) ref_connection;

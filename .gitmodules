@@ -1,3 +1,6 @@
 [submodule "threads"]
 	path = threads
 	url = https://github.com/LabDin/Simple-Multithreading
+[submodule "interface"]
+	path = interface
+	url = https://github.com/EESC-MKGroup/IPC-Interface.git

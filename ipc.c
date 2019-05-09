@@ -22,7 +22,7 @@
 
 #include <stdio.h>
 
-#include "ipc.h"
+#include "interface/ipc.h"
 
 #include "ipc_base_ip.h"
 #include "ipc_base_shm.h"
@@ -30,35 +30,39 @@
 #include <stdlib.h>
   
   
-struct _IPCConnectionData
+typedef struct _IPCConnectionData
 {
-  IPCBaseConnection baseConnection;
-  bool (*ref_ReadMessage)( IPCBaseConnection, Byte* message );
-  bool (*ref_WriteMessage)( IPCBaseConnection, const Byte* );
-  void (*ref_Close)( IPCBaseConnection );
-};
+  void* baseConnection;
+  bool (*ref_ReadMessage)( void*, Byte* message );
+  bool (*ref_WriteMessage)( void*, const Byte* );
+  void (*ref_Close)( void* );
+}
+IPCConnectionData;
 
 
-IPCConnection IPC_OpenConnection( Byte connectionType, const char* host, uint16_t channel )
+IPCConnection IPC_OpenConnection( enum IPCMode mode, const char* host, const char* channel )
 {  
   fprintf( stderr, "opening connection\n" );
   
-  IPCConnection newConnection = (IPCConnection) malloc( sizeof(IPCConnectionData) );
+  IPCConnectionData* newConnection = (IPCConnectionData*) malloc( sizeof(IPCConnectionData) );
   
-  Byte transport = (connectionType & IPC_TRANSPORT_MASK);
-  
-  if( transport == IPC_TCP || transport == IPC_UDP )
+  if( IP_IsValidAddress( host ) )
   {
-    fprintf( stderr, "%s://%s:%u", ( transport == IPC_TCP ) ? "tcp" : "udp", ( host != NULL ) ? host : "*", channel );
-    newConnection->baseConnection = IP_OpenConnection( connectionType, host, channel );
+    fprintf( stderr, "ip://%s:%s", ( host != NULL ) ? host : "*", channel );
+    uint8_t connectionType = ( mode == IPC_REQ || mode == IPC_REP ) ? IP_TCP : IP_UDP;
+    if( mode == IPC_PUB || mode == IPC_REP || mode == IPC_SERVER ) connectionType |= IP_SERVER;
+    if( mode == IPC_SUB || mode == IPC_REQ || mode == IPC_CLIENT ) connectionType |= IP_CLIENT;
+    newConnection->baseConnection = IP_OpenConnection( mode, host, channel );
     newConnection->ref_ReadMessage = IP_ReceiveMessage;
     newConnection->ref_WriteMessage = IP_SendMessage;
     newConnection->ref_Close = IP_CloseConnection;
   }
-  else if( transport == IPC_SHM )
+  else // SHM host
   {
-    fprintf( stderr, "shm:/dev/shm/%s_%u", ( host != NULL ) ? host : "data", channel );
-    newConnection->baseConnection = SHM_OpenMapping( connectionType, host, channel );
+    fprintf( stderr, "shm://%s/%s", host, channel );
+    enum MapType mappingType = SHM_CLIENT;
+    if( mode == IPC_PUB || mode == IPC_REP || mode == IPC_SERVER ) mappingType = SHM_SERVER;
+    newConnection->baseConnection = SHM_OpenMapping( mappingType, host, channel );
     newConnection->ref_ReadMessage = SHM_ReadData;
     newConnection->ref_WriteMessage = SHM_WriteData;
     newConnection->ref_Close = SHM_CloseMapping;    
@@ -67,23 +71,26 @@ IPCConnection IPC_OpenConnection( Byte connectionType, const char* host, uint16_
   if( newConnection->baseConnection == NULL )
   {
     free( newConnection );
-    return NULL;
+    return IPC_INVALID_CONNECTION;
   }
   
-  return newConnection;
+  return (IPCConnection) newConnection;
 }
 
-bool IPC_ReadMessage( IPCConnection connection, Byte* message )
+bool IPC_ReadMessage( IPCConnection ref_connection, Byte* message )
 {
-  return connection->ref_ReadMessage( (IPCBaseConnection) connection->baseConnection, message );
+  IPCConnectionData* connection = (IPCConnectionData*) ref_connection;
+  return connection->ref_ReadMessage( (void*) connection->baseConnection, message );
 }
 
-bool IPC_WriteMessage( IPCConnection connection, const Byte* message )
+bool IPC_WriteMessage( IPCConnection ref_connection, const Byte* message )
 {
-  return connection->ref_WriteMessage( (IPCBaseConnection) connection->baseConnection, message );
+  IPCConnectionData* connection = (IPCConnectionData*) ref_connection;
+  return connection->ref_WriteMessage( (void*) connection->baseConnection, message );
 }
 
-void IPC_CloseConnection( IPCConnection connection )
+void IPC_CloseConnection( IPCConnection ref_connection )
 {
-  connection->ref_Close( (IPCBaseConnection) connection->baseConnection );
+  IPCConnectionData* connection = (IPCConnectionData*) ref_connection;
+  connection->ref_Close( (void*) connection->baseConnection );
 }
