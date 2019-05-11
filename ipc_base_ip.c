@@ -288,7 +288,7 @@ IPAddress LoadAddressInfo( const char* host, const char* port, uint8_t networkRo
   int errorCode = 0;
   if( (errorCode = getaddrinfo( host, port, &hints, &hostsInfoList )) != 0 )
   {
-    fprintf( stderr, "getaddrinfo: error reading host info: %s", gai_strerror( errorCode ) );
+    fprintf( stderr, "getaddrinfo: error reading host info: %s\n", gai_strerror( errorCode ) );
     return NULL;
   }
   
@@ -331,7 +331,7 @@ int CreateSocket( uint8_t protocol, IPAddress address )
   // Create IP socket
   int socketFD = socket( address->sa_family, socketType, transportProtocol );
   if( socketFD == INVALID_SOCKET )
-    fprintf( stderr, "socket: failed opening %s %s socket", ( protocol == IP_TCP ) ? "TCP" : "UDP", ( address->sa_family == AF_INET6 ) ? "IPv6" : "IPv4" );                                                              
+    fprintf( stderr, "socket: failed opening %s %s socket\n", ( protocol == IP_TCP ) ? "TCP" : "UDP", ( address->sa_family == AF_INET6 ) ? "IPv6" : "IPv4" );                                                              
   
   return socketFD;
 }
@@ -345,7 +345,7 @@ bool SetSocketConfig( int socketFD )
   if( fcntl( socketFD, F_SETFL, O_NONBLOCK ) == SOCKET_ERROR )
   #endif
   {
-    fprintf( stderr, "failure setting socket %d to non-blocking state", socketFD );
+    fprintf( stderr, "failure setting socket %d to non-blocking state\n", socketFD );
     close( socketFD );
     return false;
   }
@@ -353,7 +353,7 @@ bool SetSocketConfig( int socketFD )
   int reuseAddress = 1; // Allow sockets to be binded to the same local port
   if( setsockopt( socketFD, SOL_SOCKET, SO_REUSEADDR, (const char*) &reuseAddress, sizeof(reuseAddress) ) == SOCKET_ERROR ) 
   {
-    fprintf( stderr, "setsockopt: failed setting socket %d option SO_REUSEADDR", socketFD );
+    fprintf( stderr, "setsockopt: failed setting socket %d option SO_REUSEADDR\n", socketFD );
     close( socketFD );
     return NULL;
   }
@@ -368,7 +368,7 @@ bool BindServerSocket( int socketFD, IPAddress address )
     int ipv6Only = 0; // Let IPV6 servers accept IPV4 clients
     if( setsockopt( socketFD, IPPROTO_IPV6, IPV6_V6ONLY, (const char*) &ipv6Only, sizeof(ipv6Only) ) == SOCKET_ERROR )
     {
-      fprintf( stderr, "setsockopt: failed setting socket %d option IPV6_V6ONLY", socketFD );
+      fprintf( stderr, "setsockopt: failed setting socket %d option IPV6_V6ONLY\n", socketFD );
       close( socketFD );
       return false;
     }
@@ -378,7 +378,7 @@ bool BindServerSocket( int socketFD, IPAddress address )
   size_t addressLength = ( address->sa_family == AF_INET6 ) ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in);
   if( bind( socketFD, address, addressLength ) == SOCKET_ERROR )
   {
-    fprintf( stderr, "bind: failed on binding socket %d", socketFD );
+    fprintf( stderr, "bind: failed on binding socket %d\n", socketFD );
     close( socketFD );
     return false;
   }
@@ -395,7 +395,7 @@ bool BindTCPServerSocket( int socketFD, IPAddress address )
   // Set server socket to listen to remote connections
   if( listen( socketFD, QUEUE_SIZE ) == SOCKET_ERROR )
   {
-    fprintf( stderr, "listen: failed listening on socket %d", socketFD );
+    fprintf( stderr, "listen: failed listening on socket %d\n", socketFD );
     close( socketFD );
     return false;
   }
@@ -413,14 +413,14 @@ bool BindUDPServerSocket( int socketFD, IPAddress address )
   {
     if( setsockopt( socketFD, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, (const char*) &multicastTTL, sizeof(multicastTTL)) != 0 ) 
     {
-      fprintf( stderr, "setsockopt: failed setting socket %d option IPV6_MULTICAST_HOPS", socketFD );
+      fprintf( stderr, "setsockopt: failed setting socket %d option IPV6_MULTICAST_HOPS\n", socketFD );
       close( socketFD );
       return false;
     }
     unsigned int interfaceIndex = 0; // 0 means default interface
     if( setsockopt( socketFD, IPPROTO_IPV6, IPV6_MULTICAST_IF, (const char*) &interfaceIndex, sizeof(interfaceIndex)) != 0 ) 
     {
-      fprintf( stderr, "setsockopt: failed setting socket %d option IPV6_MULTICAST_IF", socketFD );
+      fprintf( stderr, "setsockopt: failed setting socket %d option IPV6_MULTICAST_IF\n", socketFD );
       close( socketFD );
       return false;
     }
@@ -429,14 +429,14 @@ bool BindUDPServerSocket( int socketFD, IPAddress address )
   {
     if( setsockopt( socketFD, IPPROTO_IP, IP_MULTICAST_TTL, (const char*) &multicastTTL, sizeof(multicastTTL)) != 0 ) 
     {
-      fprintf( stderr, "setsockopt: failed setting socket %d option IP_MULTICAST_TTL", socketFD );
+      fprintf( stderr, "setsockopt: failed setting socket %d option IP_MULTICAST_TTL\n", socketFD );
       close( socketFD );
       return false;
     }
     in_addr_t interface = htonl( INADDR_ANY );
 	  if( setsockopt( socketFD, IPPROTO_IP, IP_MULTICAST_IF, (const char*) &interface, sizeof(interface)) != 0 ) 
     {
-      fprintf( stderr, "setsockopt: failed setting socket %d option IP_MULTICAST_IF", socketFD );
+      fprintf( stderr, "setsockopt: failed setting socket %d option IP_MULTICAST_IF\n", socketFD );
       close( socketFD );
       return false;
     }
@@ -445,7 +445,7 @@ bool BindUDPServerSocket( int socketFD, IPAddress address )
   int broadcast = 1; // Enable broadcast for IPv4 connections
   if( setsockopt( socketFD, SOL_SOCKET, SO_BROADCAST, (const char*) &broadcast, sizeof(broadcast) ) == SOCKET_ERROR )
   {
-    fprintf( stderr, "setsockopt: failed setting socket %d option SO_BROADCAST", socketFD );
+    fprintf( stderr, "setsockopt: failed setting socket %d option SO_BROADCAST\n", socketFD );
     close( socketFD );
     return false;
   }
@@ -460,7 +460,7 @@ bool ConnectTCPClientSocket( int socketFD, IPAddress address )
   size_t addressLength = ( address->sa_family == AF_INET6 ) ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in);
   if( connect( socketFD, address, addressLength ) == SOCKET_ERROR )
   {
-    fprintf( stderr, "connect: failed on connecting socket %d to remote address", socketFD );
+    fprintf( stderr, "connect: failed on connecting socket %d to remote address\n", socketFD );
     close( socketFD );
     return false;
   }
@@ -475,7 +475,7 @@ bool ConnectUDPClientSocket( int socketFD, IPAddress address )
   localAddress.ss_family = address->sa_family;
   if( bind( socketFD, (struct sockaddr*) &localAddress, sizeof(localAddress) ) == SOCKET_ERROR )
   {
-    fprintf( stderr, "bind: failed on binding socket %d to arbitrary local port", socketFD );
+    fprintf( stderr, "bind: failed on binding socket %d to arbitrary local port\n", socketFD );
     close( socketFD );
     return false;
   }
@@ -494,7 +494,7 @@ bool ConnectUDPClientSocket( int socketFD, IPAddress address )
       // Join the multicast address
       if ( setsockopt( socketFD, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (char*) &multicastRequest, sizeof(multicastRequest) ) != 0 ) 
       {
-        fprintf( stderr, "setsockopt: failed setting socket %d option IPV6_ADD_MEMBERSHIP", socketFD );
+        fprintf( stderr, "setsockopt: failed setting socket %d option IPV6_ADD_MEMBERSHIP\n", socketFD );
         close( socketFD );
         return false;
       }
@@ -512,7 +512,7 @@ bool ConnectUDPClientSocket( int socketFD, IPAddress address )
       // Join the multicast address
       if( setsockopt( socketFD, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &multicastRequest, sizeof(multicastRequest)) != 0 ) 
       {
-        fprintf( stderr, "setsockopt: failed setting socket %d option IP_ADD_MEMBERSHIP", socketFD );
+        fprintf( stderr, "setsockopt: failed setting socket %d option IP_ADD_MEMBERSHIP\n", socketFD );
         close( socketFD );
         return false;
       }
@@ -532,7 +532,7 @@ void* IP_OpenConnection( uint8_t connectionType, const char* host, const char* p
   uint16_t portNumber = ( port != NULL ) ? (uint16_t) strtoul( port, NULL, 0 ) : 0;
   if( portNumber > 0 && portNumber < 49152 )
   {
-    fprintf( stderr, "invalid port number value: %u", portNumber );
+    fprintf( stderr, "invalid port number value: %u\n", portNumber );
     return NULL;
   }
 
@@ -554,7 +554,7 @@ void* IP_OpenConnection( uint8_t connectionType, const char* host, const char* p
       break;
     case( IP_UDP | IP_CLIENT ): if( !ConnectUDPClientSocket( socketFD, address ) ) return NULL;
       break;
-    default: fprintf( stderr, "invalid connection type: %x", connectionType );
+    default: fprintf( stderr, "invalid connection type: %x\n", connectionType );
       return NULL;
   } 
   
@@ -569,8 +569,8 @@ void* IP_OpenConnection( uint8_t connectionType, const char* host, const char* p
     {
       globalReadThread = Thread_Start( AsyncReadQueues, NULL, THREAD_JOINABLE );
       globalWriteThread = Thread_Start( AsyncWriteQueues, NULL, THREAD_JOINABLE );
-      activeConnectionsCount++;
     }
+    activeConnectionsCount++;
   }
   
   return (void*) newConnection;
@@ -595,7 +595,7 @@ static void* AsyncReadQueues( void* args )
     activeSocketsSet = polledSocketsSet;
     int eventsNumber = select( polledSocketsNumber, &activeSocketsSet, NULL, NULL, &waitTime );
     #endif
-    if( eventsNumber == SOCKET_ERROR ) fprintf( stderr, "select: error waiting for events on %lu FDs", polledSocketsNumber );
+    if( eventsNumber == SOCKET_ERROR ) fprintf( stderr, "select: error waiting for events on %lu FDs\n", polledSocketsNumber );
     
     if( eventsNumber > 0 ) 
     {
@@ -625,14 +625,14 @@ static void* AsyncWriteQueues( void* args )
     {
       IPConnection connection = globalConnectionsList[ connectionIndex ];
       if( connection == NULL ) continue;
-      
+      fprintf( stderr, "connection %p has %lu messages\n", connection, TSQ_GetItemsCount( connection->writeQueue ) );
       // Do not proceed if queue is empty
       if( TSQ_GetItemsCount( connection->writeQueue ) == 0 ) continue;
       
       memset( &(messageOut), 0, sizeof(Message) );
       
       TSQ_Dequeue( connection->writeQueue, (void*) &messageOut, TSQUEUE_WAIT );
-  
+      
       connection->ref_SendMessage( connection, (const uint8_t*) messageOut );
     }
     
@@ -672,7 +672,7 @@ bool IP_SendMessage( void* ref_connection, const uint8_t* message )
   //if( bsearch( connection, globalConnectionsList, activeConnectionsCount, sizeof(IPConnection), CompareConnections ) == NULL ) return false;
   
   if( TSQ_GetItemsCount( connection->writeQueue ) >= QUEUE_MAX_ITEMS )
-    fprintf( stderr, "connection index %p write queue is full", connection );
+    fprintf( stderr, "connection %p write queue is full (%lu messages)\n", connection, TSQ_GetItemsCount( connection->writeQueue ) );
   
   TSQ_Enqueue( connection->writeQueue, (void*) message, TSQUEUE_NOWAIT );
   
@@ -689,7 +689,7 @@ int WaitEvents( unsigned int milliseconds )
   activeSocketsSet = polledSocketsSet;
   int eventsNumber = select( polledSocketsNumber, &activeSocketsSet, NULL, NULL, &waitTime );
   #endif
-  if( eventsNumber == SOCKET_ERROR ) fprintf( stderr, "select: error waiting for events on %lu FDs", polledSocketsNumber );
+  if( eventsNumber == SOCKET_ERROR ) fprintf( stderr, "select: error waiting for events on %lu FDs\n", polledSocketsNumber );
   
   return eventsNumber;
 }
@@ -728,14 +728,14 @@ static void ReceiveTCPClientMessage( IPConnection connection )
 
   if( bytesReceived == SOCKET_ERROR )
   {
-    fprintf( stderr, "recv: error reading from socket %d", connection->socket->fd );
+    fprintf( stderr, "recv: error reading from socket %d\n", connection->socket->fd );
     //connection->socket->fd = INVALID_SOCKET;
     //RemoveSocket( connection->socket->fd );
     return;
   }
   else if( bytesReceived == 0 )
   {
-    fprintf( stderr, "recv: remote connection with socket %d closed", connection->socket->fd );
+    fprintf( stderr, "recv: remote connection with socket %d closed\n", connection->socket->fd );
     //connection->socket->fd = INVALID_SOCKET;
     RemoveSocket( connection->socket->fd );
     return;
@@ -748,7 +748,7 @@ static void ReceiveTCPClientMessage( IPConnection connection )
 static void SendTCPClientMessage( IPConnection connection, const uint8_t* message )
 {
   if( send( connection->socket->fd, (void*) message, IP_MAX_MESSAGE_LENGTH, 0 ) == SOCKET_ERROR )
-    fprintf( stderr, "send: error writing to socket %d", connection->socket->fd );
+    fprintf( stderr, "send: error writing to socket %d\n", connection->socket->fd );
 }
 
 // Try to receive incoming message from the given UDP client connection and store it on its buffer
@@ -774,7 +774,7 @@ static void ReceiveUDPClientMessage( IPConnection connection )
 static void SendUDPClientMessage( IPConnection connection, const uint8_t* message )
 {
   if( sendto( connection->socket->fd, message, IP_MAX_MESSAGE_LENGTH, 0, (IPAddress) &(connection->addressData), sizeof(IPAddressData) ) == SOCKET_ERROR )
-    fprintf( stderr, "sendto: error writing to socket %d", connection->socket->fd );
+    fprintf( stderr, "sendto: error writing to socket %d\n", connection->socket->fd );
 }
 
 // Send given message to all the clients of the given TCP server connection
@@ -784,7 +784,7 @@ static void SendTCPServerMessages( IPConnection connection, const uint8_t* messa
   {
     SocketPoller* clientSocket = (SocketPoller*) connection->clientsList[ clientIndex ];
     if( send( clientSocket->fd, message, IP_MAX_MESSAGE_LENGTH, 0 ) == SOCKET_ERROR )
-      fprintf( stderr, "send: error writing to socket %d", clientSocket->fd );
+      fprintf( stderr, "send: error writing to socket %d\n", clientSocket->fd );
   }
 }
 
@@ -796,7 +796,7 @@ static void SendUDPServerMessages( IPConnection connection, const uint8_t* messa
     socklen_t addressLength = sizeof(IPAddressData);
     IPAddress clientAddress = (IPAddress) &(connection->addressesList[ clientIndex ]);
     if( sendto( connection->socket->fd, (void*) message, IP_MAX_MESSAGE_LENGTH, 0, clientAddress, addressLength ) == SOCKET_ERROR )
-      fprintf( stderr, "send: error writing to socket %d", connection->socket->fd );
+      fprintf( stderr, "send: error writing to socket %d\n", connection->socket->fd );
   }
 }
 
@@ -851,7 +851,7 @@ static void ReceiveUDPServerMessages( IPConnection server )
   socklen_t addressLength = sizeof(IPAddressData);
   if( recvfrom( server->socket->fd, (void*) messageIn, IP_MAX_MESSAGE_LENGTH, 0, (IPAddress) &(addressData), &addressLength ) == SOCKET_ERROR )
   {
-    fprintf( stderr, "recvfrom: error reading from socket %d", server->socket->fd );
+    fprintf( stderr, "recvfrom: error reading from socket %d\n", server->socket->fd );
     return;
   }
   
