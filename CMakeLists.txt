@@ -32,14 +32,14 @@ set( USE_IP_LEGACY false CACHE BOOL "Enable to compile for older systems, with n
     include( ${CMAKE_CURRENT_LIST_DIR}/threads/CMakeLists.txt )
   endif()
 
-  add_library( AsyncIPC SHARED ${CMAKE_CURRENT_LIST_DIR}/ipc.c ${CMAKE_CURRENT_LIST_DIR}/ipc_base_ip.c ${CMAKE_CURRENT_LIST_DIR}/ipc_base_shm.c )
-  set_target_properties( AsyncIPC PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${LIBRARY_DIR} )
-  target_include_directories( AsyncIPC PUBLIC ${CMAKE_CURRENT_LIST_DIR} )
-  target_link_libraries( AsyncIPC MultiThreading )
+  add_library( IPC SHARED ${CMAKE_CURRENT_LIST_DIR}/ipc.c ${CMAKE_CURRENT_LIST_DIR}/ipc_base_ip.c ${CMAKE_CURRENT_LIST_DIR}/ipc_base_shm.c )
+  set_target_properties( IPC PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${LIBRARY_DIR} )
+  target_include_directories( IPC PUBLIC ${CMAKE_CURRENT_LIST_DIR} )
+  target_link_libraries( IPC MultiThreading )
 
-  target_compile_definitions( AsyncIPC PUBLIC -D_DEFAULT_SOURCE=__STRICT_ANSI__ -DDEBUG )
+  target_compile_definitions( IPC PUBLIC -D_DEFAULT_SOURCE=__STRICT_ANSI__ -DDEBUG )
   if( USE_IP_LEGACY )
-    target_compile_definitions( AsyncIPC PUBLIC -DIP_NETWORK_LEGACY )
+    target_compile_definitions( IPC PUBLIC -DIP_NETWORK_LEGACY )
   endif()
 
 # endif()

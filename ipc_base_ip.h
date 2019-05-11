@@ -32,9 +32,6 @@
 #define IP_TCP 0x10                    
 #define IP_UDP 0x20                     
 
-#define IP_TRANSPORT_MASK 0xF0
-#define IP_ROLE_MASK  0x0F
-
 
 bool IP_IsValidAddress( const char* addressString );
 

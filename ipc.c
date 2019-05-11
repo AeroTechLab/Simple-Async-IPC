@@ -48,18 +48,20 @@ IPCConnection IPC_OpenConnection( enum IPCMode mode, const char* host, const cha
   
   if( IP_IsValidAddress( host ) )
   {
-    fprintf( stderr, "ip://%s:%s", ( host != NULL ) ? host : "*", channel );
-    uint8_t connectionType = ( mode == IPC_REQ || mode == IPC_REP ) ? IP_TCP : IP_UDP;
-    if( mode == IPC_PUB || mode == IPC_REP || mode == IPC_SERVER ) connectionType |= IP_SERVER;
-    if( mode == IPC_SUB || mode == IPC_REQ || mode == IPC_CLIENT ) connectionType |= IP_CLIENT;
-    newConnection->baseConnection = IP_OpenConnection( mode, host, channel );
+    fprintf( stderr, "ip://%s:%s\n", ( host != NULL ) ? host : "*", ( channel != NULL ) ? channel : "0" );
+    uint8_t connectionType = 0;
+    if( mode == IPC_REQ ) connectionType = ( IP_TCP | IP_CLIENT );
+    else if( mode == IPC_REP ) connectionType = ( IP_TCP | IP_SERVER );
+    else if( mode == IPC_SUB || mode == IPC_CLIENT ) connectionType = ( IP_UDP | IP_CLIENT );
+    else if( mode == IPC_PUB || mode == IPC_SERVER ) connectionType = ( IP_UDP | IP_SERVER );
+    newConnection->baseConnection = IP_OpenConnection( connectionType, host, channel );
     newConnection->ref_ReadMessage = IP_ReceiveMessage;
     newConnection->ref_WriteMessage = IP_SendMessage;
     newConnection->ref_Close = IP_CloseConnection;
   }
   else // SHM host
   {
-    fprintf( stderr, "shm://%s/%s", host, channel );
+    fprintf( stderr, "shm://%s/%s\n", host, channel );
     newConnection->baseConnection = NULL;
     if( mode == IPC_REQ ) newConnection->baseConnection = SHM_OpenMapping( host, channel, "rep", "req" );
     else if( mode == IPC_REP ) newConnection->baseConnection = SHM_OpenMapping( host, channel, "req", "rep" );

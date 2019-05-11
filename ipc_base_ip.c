@@ -299,7 +299,7 @@ IPAddress LoadAddressInfo( const char* host, const char* port, uint8_t networkRo
   if( hostInfo == NULL ) return (IPAddress) NULL;
   #else
   addressData.sin_family = AF_INET;   // IPv4 address
-  uint16_t portNumber = (uint16_t) strtoul( port, NULL, 0 );
+  uint16_t portNumber = ( port != NULL ) ? (uint16_t) strtoul( port, NULL, 0 ) : 0;
   addressData.sin_port = htons( portNumber );
   if( host == NULL ) addressData.sin_addr.s_addr = INADDR_ANY;
   else if( strcmp( host, "255.255.255.255" ) == 0 ) addressData.sin_addr.s_addr = INADDR_BROADCAST; 
@@ -327,7 +327,7 @@ int CreateSocket( uint8_t protocol, IPAddress address )
   {
     return INVALID_SOCKET;
   }
-  
+
   // Create IP socket
   int socketFD = socket( address->sa_family, socketType, transportProtocol );
   if( socketFD == INVALID_SOCKET )
@@ -528,16 +528,17 @@ void* IP_OpenConnection( uint8_t connectionType, const char* host, const char* p
 {
   const uint8_t TRANSPORT_MASK = 0xF0, ROLE_MASK = 0x0F;
   
-  // Assure that the port number is in the Dynamic/Private range (49152-65535)
-  if( strtoul( port, NULL, 0 ) < 49152 /*|| strtoul( port, NULL, 0 ) > 65535*/ )
+  // Ensure that the port number is in the Dynamic/Private range (49152-65535)
+  uint16_t portNumber = ( port != NULL ) ? (uint16_t) strtoul( port, NULL, 0 ) : 0;
+  if( portNumber > 0 && portNumber < 49152 )
   {
-    fprintf( stderr, "invalid port number value: %lu", strtoul( port, NULL, 0 ) );
+    fprintf( stderr, "invalid port number value: %u", portNumber );
     return NULL;
   }
-  
+
   IPAddress address = LoadAddressInfo( host, port, (connectionType & ROLE_MASK) );
   if( address == NULL ) return NULL;
-  
+
   Socket socketFD = CreateSocket( (connectionType & TRANSPORT_MASK), address );
   if( socketFD == INVALID_SOCKET ) return NULL;
   
