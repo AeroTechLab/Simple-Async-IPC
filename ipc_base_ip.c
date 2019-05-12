@@ -625,7 +625,7 @@ static void* AsyncWriteQueues( void* args )
     {
       IPConnection connection = globalConnectionsList[ connectionIndex ];
       if( connection == NULL ) continue;
-      fprintf( stderr, "connection %p has %lu messages\n", connection, TSQ_GetItemsCount( connection->writeQueue ) );
+
       // Do not proceed if queue is empty
       if( TSQ_GetItemsCount( connection->writeQueue ) == 0 ) continue;
       
@@ -636,14 +636,15 @@ static void* AsyncWriteQueues( void* args )
       connection->ref_SendMessage( connection, (const uint8_t*) messageOut );
     }
     
+// Sleep for 1 millisecond
 #ifdef _WIN32
-    Sleep( 1000 );
+    Sleep( 1 );
 #else
-    usleep( 1000*1000 );  /* sleep for 1000 milliSeconds */
+    usleep( 1000 );
 #endif
   }
   
-  return NULL;//(void*) 1;
+  return NULL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -672,7 +673,7 @@ bool IP_SendMessage( void* ref_connection, const uint8_t* message )
   //if( bsearch( connection, globalConnectionsList, activeConnectionsCount, sizeof(IPConnection), CompareConnections ) == NULL ) return false;
   
   if( TSQ_GetItemsCount( connection->writeQueue ) >= QUEUE_MAX_ITEMS )
-    fprintf( stderr, "connection %p write queue is full (%lu messages)\n", connection, TSQ_GetItemsCount( connection->writeQueue ) );
+    fprintf( stderr, "connection %p write queue is full\n", connection );
   
   TSQ_Enqueue( connection->writeQueue, (void*) message, TSQUEUE_NOWAIT );
   
