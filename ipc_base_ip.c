@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////////////////////////
 //                                                                                  //
-//  Copyright (c) 2016-2020 Leonardo Consoni <.com>             //
+//  Copyright (c) 2016-2025 Leonardo Consoni <.com>             //
 //                                                                                  //
 //  This file is part of Simple Async IPC.                                          //
 //                                                                                  //
@@ -59,7 +59,7 @@
   #include <sys/types.h>
   #include <sys/socket.h>
   #include <sys/time.h>
-  #include <stropts.h>
+  // #include <stropts.h>
   #include <netinet/in.h>
   #include <arpa/inet.h>
   #include <netdb.h>
